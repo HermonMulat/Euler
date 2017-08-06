@@ -57,6 +57,17 @@ def factors_of(n):
 
     return sorted( list(set(first_half+second_half)))
 
+def divisors_half(n):
+    #factorizes a given number (returns a list that contains all the factors)
+    first_half=[]
+    if n==1:
+        return [1]
+
+    for i in range (2,int(math.sqrt(n))+1):
+        if (n%i == 0):
+            first_half.append(i)
+
+    return first_half
 
 
 def prime_factorize(n):
