@@ -1,25 +1,6 @@
 import sys, time, math
 from sieve import sieve2
 
-def sieve2(n):
-    """
-    Sieve of Eratosthenes to determine prime factors less than n
-    """
-    mark = [True for i in xrange(n+1)]
-    p=2
-    while(p*p <= n ):
-        if (mark[p] == True):
-            for i in xrange(2*p,n+1,p):
-                mark[i] = False
-        p +=1
-
-    primes = []
-    for i in range(2,len(mark)):
-        if mark[i]:
-            primes.append(i)
-
-    return mark,primes
-
 def bisect(n,p):
     count = 0
     while n%p == 0:
