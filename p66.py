@@ -1,5 +1,5 @@
 import math,sys,time
-from support import gcd
+from fractions import gcd
 def sqrt_frac(n):
     flor = int(math.sqrt(n))
     if flor*flor == n:
