@@ -1,7 +1,12 @@
-import sys
+import sys, curses, time
 from termcolor import colored
 from itertools import product
 from copy import deepcopy
+
+stdscr = curses.initscr()
+stdscr.clear()
+#curses.noecho()
+curses.cbreak()
 
 class Grid:
   def __init__(self, grid):
@@ -68,19 +73,23 @@ class Grid:
       else:
         for i in s:
           return str(i)
-
+    gridStr = []
     for r,row in enumerate(self.probGrid):
       if r % 3 == 0:
-        print "+---+---+---+"
+        gridStr.append("+---+---+---+")
       strR = [getElem(elem) for elem in row]
       rowS = "".join(["|"] + strR[:3] +["|"]+ strR[3:6] +["|"]+ strR[6:] + ["|"])
-      print rowS
-    print "+---+---+---+"
+      gridStr.append(rowS)
+    gridStr.append("+---+---+---+")
+    return gridStr
 
 TOTAL = 0
 def sudoku(grid):
-  global TOTAL
+  global TOTAL,stdscr
   while not grid.isComplete():
+    for i,s in enumerate(grid.show()):
+      stdscr.addstr(i+1,0,s)
+    stdscr.refresh()
     for i,j in product(range(9),range(9)):
       change, updateSet = grid.update(i,j)
       grid.probGrid[i][j] = updateSet
@@ -99,12 +108,12 @@ def sudoku(grid):
             toRemove.add(elem)
         grid.probGrid[i][j] = updateSet.difference(toRemove)
 
-  grid.show()
   getE = lambda x,y: str(list(grid.probGrid[x][y])[0])
   TOTAL += int("".join([getE(k[0],k[1]) for k in [(0,0),(0,1),(0,2)]]).strip())
   return True
 
 def main():
+  global stdscr
   grid, count = [], 9
   gridCount = 0
   for line in sys.stdin:
@@ -116,12 +125,15 @@ def main():
       if count == 9:
         g = Grid(grid)
         gridCount += 1
-        print "Solution for grid {}:".format(gridCount)
+        stdscr.addstr(0,0, "Solving for grid {}:".format(gridCount))
         sudoku(g)
-        print
-  ans = colored(TOTAL, 'green')
-  print "\nSum of first 3 digits of all 50 solved grids is {}".format(ans)
 
 if __name__ == '__main__':
-  main()
-
+  try:
+    main()
+  finally:
+    curses.echo()
+    curses.nocbreak()
+    curses.endwin()
+    ans = colored(TOTAL, 'green')
+    print "Sum of first 3 digits of all 50 solved grids is {}".format(ans)
