@@ -1,119 +1,80 @@
 import sys, curses, time
 from termcolor import colored
 from itertools import product
+from collections import defaultdict as dd
 from copy import deepcopy
 
 stdscr = curses.initscr()
+curses.start_color()
+curses.use_default_colors()
 stdscr.clear()
-#curses.noecho()
+curses.noecho()
 curses.cbreak()
 
 class Grid:
   def __init__(self, grid):
-    if type(grid) == type(self):
-      self.probGrid = deepcopy(grid.probGrid)
-      return
-    self.probGrid = []
-    for row in grid:
-      probRow = []
-      for elem in row:
-        e = set(range(1,10)) if elem == 0 else set([elem])
-        probRow.append(e)
-      self.probGrid.append(probRow)
+    self.grid = grid
+    self.rows, self.cols, self.box = dd(set), dd(set), dd(set)
+    for r in range(9):
+      for c in xrange(9):
+        v = self.get(r,c)
+        if v != 0:
+          self.rows[r].add(v)
+          self.cols[c].add(v)
+          self.box[(r/3,c/3)].add(v)
 
-  def get(self, i, j):
-    return self.probGrid[i][j]
-
-  def getRow(self, r):
-    row = set()
-    for e in self.probGrid[r]:
-      if len(e) == 1:
-        row |= e
-    return row
-
-  def getCol(self, c):
-    col = set()
-    for i in xrange(9):
-      e = self.probGrid[i][c]
-      if len(e) == 1:
-        col |= e
-    return col
-
-  def getCell(self,r,c):
-    cell = set()
-    for i in xrange(r*3, r*3+3):
-      for j in xrange(c*3, c*3+3):
-        e = self.probGrid[i][j]
-        if len(e) == 1:
-          cell |= e
-    return cell
-
-  def update(self, r,c):
-    curr = self.probGrid[r][c]
-    if len(curr) == 1:
-      return False, curr
-    forbidden = self.getRow(r) | self.getCol(c) | self.getCell(r/3,c/3)
-    posUpdate = curr.difference(forbidden)
-    return True, posUpdate
-
-  def isFilled(self, r, c):
-    return len(self.probGrid[r][c]) == 1
-
-  def isComplete(self):
-    for i in xrange(9):
-      for j in xrange(9):
-        if not self.isFilled(i,j):
-          return False
-    return True
+  def get(self,r,c):
+    return self.grid[r*9 + c]
+  def set(self,r,c,v):
+    self.grid[r*9 + c] = v
+    self.rows[r].add(v)
+    self.cols[c].add(v)
+    self.box[(r/3,c/3)].add(v)
+  def unset(self,r,c,v):
+    self.grid[r*9 + c] = 0
+    self.rows[r].remove(v)
+    self.cols[c].remove(v)
+    self.box[(r/3,c/3)].remove(v)
 
   def show(self):
-    def getElem(s):
-      if len(s) != 1:
-        return " "
-      else:
-        for i in s:
-          return str(i)
     gridStr = []
-    for r,row in enumerate(self.probGrid):
+    for r in xrange(9):
       if r % 3 == 0:
         gridStr.append("+---+---+---+")
-      strR = [getElem(elem) for elem in row]
+      strR = [str(self.get(r,c)) for c in xrange(9)]
       rowS = "".join(["|"] + strR[:3] +["|"]+ strR[3:6] +["|"]+ strR[6:] + ["|"])
-      gridStr.append(rowS)
+      gridStr.append(rowS.replace("0", " "))
     gridStr.append("+---+---+---+")
     return gridStr
 
 TOTAL = 0
-def sudoku(grid):
+def sudoku(grid, at, px, py, show=True):
   global TOTAL,stdscr
-  while not grid.isComplete():
+  r,c =  divmod(at,9)
+  if show:
     for i,s in enumerate(grid.show()):
-      stdscr.addstr(i+1,0,s)
+      stdscr.addstr(px+i+1,py,s)
     stdscr.refresh()
-    for i,j in product(range(9),range(9)):
-      change, updateSet = grid.update(i,j)
-      grid.probGrid[i][j] = updateSet
-    for i,j in product(range(9),range(9)):
-      change, updateSet = grid.update(i,j)
-      toRemove = set()
-      if change:
-        if len(updateSet) == 0:
-          return False
-        for elem in updateSet:
-          newGrid = Grid(grid)
-          newGrid.probGrid[i][j] = set([elem])
-          if sudoku(newGrid):
-            return True
-          else:
-            toRemove.add(elem)
-        grid.probGrid[i][j] = updateSet.difference(toRemove)
 
-  getE = lambda x,y: str(list(grid.probGrid[x][y])[0])
-  TOTAL += int("".join([getE(k[0],k[1]) for k in [(0,0),(0,1),(0,2)]]).strip())
-  return True
+  if at == 81:
+    TOTAL += int("".join(map(str,grid.grid[:3])))
+    return True
+
+  if grid.get(r,c) != 0:
+    return sudoku(grid, at+1, px, py, show)
+
+  possible = set(range(1,10)).difference( grid.rows[r], grid.cols[c],
+                    grid.box[(r/3, c/3)] )
+  for v in possible:
+    grid.set(r,c,v)
+    if sudoku(grid, at+1, px, py, show):
+      return True
+    grid.unset(r,c,v)
+  return False
 
 def main():
   global stdscr
+  curses.init_pair(1, curses.COLOR_GREEN, -1)
   grid, count = [], 9
   gridCount = 0
   for line in sys.stdin:
@@ -121,14 +82,20 @@ def main():
     if count == 10:
       count, grid = 0, []
     else:
-      grid.append(map(int, list(line.strip())))
+      grid += map(int, list(line.strip()))
       if count == 9:
         g = Grid(grid)
+        px,py = ( (gridCount%15)/5)*14, ((gridCount%15)%5)*14
         gridCount += 1
-        stdscr.addstr(0,0, "Solving for grid {}:".format(gridCount))
-        sudoku(g)
+        stdscr.addstr(px,py, "Solving G{}:".format(gridCount),curses.color_pair(1))
+        sudoku(g, 0, px, py, bool(int(sys.argv[1])))
+        stdscr.addstr(px,py, "G{}:        ".format(gridCount))
 
 if __name__ == '__main__':
+  '''
+  run as:
+    python p96.py [show progress: 1/0] < p096_sudoku.txt
+  '''
   try:
     main()
   finally:
